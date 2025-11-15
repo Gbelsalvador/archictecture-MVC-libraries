@@ -1,0 +1,15 @@
+{
+    "autoload": {
+        "psr-4": {
+            "Core\\" : "core/",
+            "Controllers\\" : "controllers/",
+            "Models\\" : "models/",
+            "Router\\" : "router/",
+            "Config\\" : "config/"
+        }
+    },
+    "name": "nossyrrah/mololoplus_final",
+    "require": {
+        "altorouter/altorouter": "^2.0"
+    }
+}
