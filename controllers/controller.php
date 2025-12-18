@@ -1,10 +1,10 @@
 <?php
 namespace Controllers;
-require_once __DIR__ . '/../models/DataModel.php';
 
-use \DataModel;
+use Models\DataModel;
+
 class Controller {
-    protected $db;
+    protected DataModel $db;
 
     public function __construct() {
         $this->db = new DataModel();
@@ -35,6 +35,6 @@ class Controller {
     }
 
     public function isConnected() {
-        return $this->db instanceof \PDO;
+        return $this->db->getPDO() instanceof \PDO;
     }
 }

@@ -4,4 +4,12 @@
         $core->http_json_status_methode(200,'api fonctionnelle !!!!!!', ['datas' => 'des datas']);
     });
 
+    // Test POST route: echo JSON body
+    Router\Router::post('/api/echo', function() use ($core) {
+        $input = $core->http_json_input();
+        $controller = new Controllers\ApiController();
+        $data = $controller->echoPost($input);
+        $core->jsonResponse(200, $data, true);
+    });
+
 ?>

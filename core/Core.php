@@ -4,16 +4,13 @@ namespace Core;
 
 class Core
 {
-    /** @var \UserModel */
-    protected $userModel;
+    protected \Models\UserModel $userModel;
+    protected \Models\DataModel $dataModel;
 
     public function __construct()
     {
-        $baseDir = dirname(__DIR__);
-        require_once $baseDir . DIRECTORY_SEPARATOR . 'models' . DIRECTORY_SEPARATOR . 'DataModel.php';
-        require_once $baseDir . DIRECTORY_SEPARATOR . 'models' . DIRECTORY_SEPARATOR . 'UserModel.php';
-
-        $this->userModel = new \UserModel();
+        $this->dataModel = new \Models\DataModel();
+        $this->userModel = new \Models\UserModel($this->dataModel);
     }
 
     /**

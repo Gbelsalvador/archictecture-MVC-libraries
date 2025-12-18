@@ -1,5 +1,7 @@
 <?php
 
+namespace Models;
+
 class DataModel
 {
     protected ?\PDO $pdo = null;
