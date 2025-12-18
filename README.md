@@ -165,7 +165,3 @@ Support & tests
 curl http://localhost:8000/api
 curl -X POST -H "Content-Type: application/json" -d '{"foo":"bar"}' http://localhost:8000/api/echo
 ```
-
-Souhaitez-vous que je :
-- ajoute un contrôleur d'exemple CRUD complet ?
-- crée un petit script d'envoi d'e-mails de test et un endpoint pour l'upload ?
