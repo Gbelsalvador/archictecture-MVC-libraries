@@ -1,0 +1,617 @@
+#!/usr/bin/env php
+<?php
+/**
+ * AUTOMAT - Outil de ligne de commande pour l'architecture MVC
+ * 
+ * Usage: php automat create:model NomModele
+ *        php automat create:controller NomController
+ *        php automat create:model Produit,Commande,Utilisateur
+ *        php automat create:controller ArticleController,ApiController
+ */
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+// Chargement des variables d'environnement
+if (file_exists(__DIR__ . '/.env')) {
+    $env = parse_ini_file(__DIR__ . '/.env');
+    foreach ($env as $key => $value) {
+        $_ENV[$key] = $value;
+    }
+}
+
+class Automat
+{
+    private array $commands = [];
+    
+    public function __construct()
+    {
+        $this->registerCommands();
+    }
+    
+    private function registerCommands(): void
+    {
+        $this->commands = [
+            'create:model' => [
+                'description' => 'Créer un ou plusieurs modèles',
+                'usage' => 'create:model <NomModele> [NomModele2,...]',
+                'handler' => [$this, 'createModel']
+            ],
+            'create:controller' => [
+                'description' => 'Créer un ou plusieurs contrôleurs',
+                'usage' => 'create:controller <NomController> [NomController2,...]',
+                'handler' => [$this, 'createController']
+            ],
+            'list' => [
+                'description' => 'Lister les commandes disponibles',
+                'usage' => 'list',
+                'handler' => [$this, 'listCommands']
+            ],
+            'help' => [
+                'description' => 'Afficher l\'aide',
+                'usage' => 'help [command]',
+                'handler' => [$this, 'showHelp']
+            ]
+        ];
+    }
+    
+    public function run(array $argv): void
+    {
+        $command = $argv[1] ?? 'list';
+        
+        if (!isset($this->commands[$command])) {
+            $this->error("Commande inconnue: $command");
+            $this->listCommands();
+            exit(1);
+        }
+        
+        call_user_func($this->commands[$command]['handler'], $argv);
+    }
+    
+    public function createModel(array $argv): void
+    {
+        if (!isset($argv[2])) {
+            $this->error("Usage: php automat create:model <NomModele> [NomModele2,...]");
+            exit(1);
+        }
+        
+        $models = $this->parseNames($argv[2]);
+        
+        foreach ($models as $modelName) {
+            $this->generateModel($modelName);
+        }
+        
+        $this->success(count($models) . " modèle(s) créé(s) avec succès !");
+    }
+    
+    public function createController(array $argv): void
+    {
+        if (!isset($argv[2])) {
+            $this->error("Usage: php automat create:controller <NomController> [NomController2,...]");
+            exit(1);
+        }
+        
+        $controllers = $this->parseNames($argv[2]);
+        
+        foreach ($controllers as $controllerName) {
+            $this->generateController($controllerName);
+        }
+        
+        $this->success(count($controllers) . " contrôleur(s) créé(s) avec succès !");
+    }
+    
+    private function parseNames(string $input): array
+    {
+        // Supporte les noms séparés par virgule
+        $names = array_map('trim', explode(',', $input));
+        
+        // Nettoie les noms et supprime les vides
+        $names = array_filter($names, function($name) {
+            return !empty($name);
+        });
+        
+        return $names;
+    }
+    
+    private function generateModel(string $modelName): void
+    {
+        // S'assure que le nom se termine par "Model"
+        if (!preg_match('/Model$/i', $modelName)) {
+            $modelName .= 'Model';
+        }
+        
+        $className = ucfirst($modelName);
+        $fileName = __DIR__ . "/models/{$className}.php";
+        
+        if (file_exists($fileName)) {
+            $this->warning("Le modèle {$className} existe déjà. Écrasement...");
+        }
+        
+        $template = <<<PHP
+<?php
+/**
+ * {$className} - Modèle pour la table {$this->getTableName($className)}
+ * 
+ * Généré automatiquement le @date@
+ * 
+ * @package Models
+ */
+
+namespace Models;
+
+class {$className}
+{
+    /**
+     * @var DataModel Instance de DataModel pour l'accès à la base
+     */
+    protected DataModel \$db;
+
+    /**
+     * Constructeur
+     * 
+     * @param DataModel|null \$db Instance de DataModel (injection de dépendance)
+     */
+    public function __construct(DataModel \$db = null)
+    {
+        \$this->db = \$db ?? new DataModel();
+    }
+
+    /**
+     * Récupère tous les enregistrements
+     * 
+     * @return array Tableau d'objets
+     */
+    public function findAll(): array
+    {
+        \$pdo = \$this->db->getPDO();
+        \$stmt = \$pdo->query('SELECT * FROM @table_name@');
+        return \$stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Récupère un enregistrement par son ID
+     * 
+     * @param int \$id ID de l'enregistrement
+     * @return array|null Données ou null si non trouvé
+     */
+    public function findById(int \$id): ?array
+    {
+        \$pdo = \$this->db->getPDO();
+        \$stmt = \$pdo->prepare('SELECT * FROM @table_name@ WHERE id = :id');
+        \$stmt->execute([':id' => \$id]);
+        \$result = \$stmt->fetch(\PDO::FETCH_ASSOC);
+        
+        return \$result ?: null;
+    }
+
+    /**
+     * Crée un nouvel enregistrement
+     * 
+     * @param array \$data Données à insérer
+     * @return bool|string Succès ou message d'erreur
+     */
+    public function create(array \$data)
+    {
+        try {
+            \$pdo = \$this->db->getPDO();
+            \$columns = implode(', ', array_keys(\$data));
+            \$placeholders = ':' . implode(', :', array_keys(\$data));
+            
+            \$sql = "INSERT INTO @table_name@ (\$columns) VALUES (\$placeholders)";
+            \$stmt = \$pdo->prepare(\$sql);
+            
+            return \$stmt->execute(\$data);
+        } catch (\PDOException \$e) {
+            return \$e->getMessage();
+        }
+    }
+
+    /**
+     * Met à jour un enregistrement
+     * 
+     * @param int \$id ID de l'enregistrement
+     * @param array \$data Données à mettre à jour
+     * @return bool|string Succès ou message d'erreur
+     */
+    public function update(int \$id, array \$data)
+    {
+        try {
+            \$pdo = \$this->db->getPDO();
+            \$setClause = implode(', ', array_map(function(\$key) {
+                return "\$key = :\$key";
+            }, array_keys(\$data)));
+            
+            \$sql = "UPDATE @table_name@ SET \$setClause WHERE id = :id";
+            \$stmt = \$pdo->prepare(\$sql);
+            
+            \$data[':id'] = \$id;
+            return \$stmt->execute(\$data);
+        } catch (\PDOException \$e) {
+            return \$e->getMessage();
+        }
+    }
+
+    /**
+     * Supprime un enregistrement
+     * 
+     * @param int \$id ID de l'enregistrement
+     * @return bool Succès de la suppression
+     */
+    public function delete(int \$id): bool
+    {
+        \$pdo = \$this->db->getPDO();
+        \$stmt = \$pdo->prepare('DELETE FROM @table_name@ WHERE id = :id');
+        return \$stmt->execute([':id' => \$id]);
+    }
+    }
+}
+PHP;
+
+        $template = str_replace(
+            ['@date@', '@table_name@'],
+            [date('Y-m-d H:i:s'), $this->getTableName($className)],
+            $template
+        );
+        
+        // Crée le dossier models s'il n'existe pas
+        if (!is_dir(dirname($fileName))) {
+            mkdir(dirname($fileName), 0755, true);
+        }
+        
+        file_put_contents($fileName, $template);
+        $this->info("✓ Modèle créé: models/{$className}.php");
+    }
+    
+    private function generateController(string $controllerName): void
+    {
+        // S'assure que le nom se termine par "Controller"
+        if (!preg_match('/Controller$/i', $controllerName)) {
+            $controllerName .= 'Controller';
+        }
+        
+        $className = ucfirst($controllerName);
+        $fileName = __DIR__ . "/controllers/{$className}.php";
+        
+        if (file_exists($fileName)) {
+            $this->warning("Le contrôleur {$className} existe déjà. Écrasement...");
+        }
+        
+        $modelName = str_replace('Controller', 'Model', $className);
+        $viewFolder = strtolower(str_replace('Controller', '', $className));
+        
+        $template = <<<PHP
+<?php
+/**
+ * {$className} - Contrôleur pour gérer les @entity_name@
+ * 
+ * Généré automatiquement le @date@
+ * 
+ * @package Controllers
+ */
+
+namespace Controllers;
+
+class {$className} extends Controller
+{
+    /**
+     * Liste tous les @entity_name@
+     * 
+     * @param mixed ...\$args Arguments de la route
+     * @return void
+     */
+    public function index(...\$args)
+    {
+        \$model = new \Models\\{$modelName}(\$this->db);
+        \$data = \$model->findAll();
+        
+        \$this->render('@view_folder@/index', [
+            '@variable_name@' => \$data,
+            'title' => 'Liste des @entity_name@'
+        ]);
+    }
+
+    /**
+     * Affiche un @entity_name@ spécifique
+     * 
+     * @param mixed ...\$args Arguments de la route
+     * @return void
+     */
+    public function show(...\$args)
+    {
+        \$id = \$args['id'] ?? \$args[0] ?? null;
+        
+        if (!\$id) {
+            \$this->error('ID non fourni');
+            return;
+        }
+        
+        \$model = new \Models\\{$modelName}(\$this->db);
+        \$item = \$model->findById((int)\$id);
+        
+        if (!\$item) {
+            \$this->error('@entity_name@ non trouvé');
+            return;
+        }
+        
+        \$this->render('@view_folder@/show', [
+            '@singular_name@' => \$item,
+            'title' => 'Détails du @entity_name@'
+        ]);
+    }
+
+    /**
+     * Affiche le formulaire de création
+     * 
+     * @param mixed ...\$args Arguments de la route
+     * @return void
+     */
+    public function create(...\$args)
+    {
+        \$this->render('@view_folder@/create', [
+            'title' => 'Créer un @entity_name@'
+        ]);
+    }
+
+    /**
+     * Traite la création d'un @entity_name@
+     * 
+     * @param mixed ...\$args Arguments de la route
+     * @return void
+     */
+    public function store(...\$args)
+    {
+        // Validation des données
+        \$data = \$_POST;
+        
+        // Exemple de validation basique
+        if (empty(\$data['name'])) {
+            \$this->error('Le nom est requis');
+            return;
+        }
+        
+        \$model = new \Models\\{$modelName}(\$this->db);
+        \$result = \$model->create(\$data);
+        
+        if (\$result === true) {
+            \$this->success('@entity_name@ créé avec succès');
+            \$this->redirection('/@route_name@');
+        } else {
+            \$this->error('Erreur lors de la création: ' . \$result);
+        }
+    }
+
+    /**
+     * Affiche le formulaire d'édition
+     * 
+     * @param mixed ...\$args Arguments de la route
+     * @return void
+     */
+    public function edit(...\$args)
+    {
+        \$id = \$args['id'] ?? \$args[0] ?? null;
+        
+        if (!\$id) {
+            \$this->error('ID non fourni');
+            return;
+        }
+        
+        \$model = new \Models\\{$modelName}(\$this->db);
+        \$item = \$model->findById((int)\$id);
+        
+        if (!\$item) {
+            \$this->error('@entity_name@ non trouvé');
+            return;
+        }
+        
+        \$this->render('@view_folder@/edit', [
+            '@singular_name@' => \$item,
+            'title' => 'Modifier le @entity_name@'
+        ]);
+    }
+
+    /**
+     * Traite la mise à jour d'un @entity_name@
+     * 
+     * @param mixed ...\$args Arguments de la route
+     * @return void
+     */
+    public function update(...\$args)
+    {
+        \$id = \$args['id'] ?? \$args[0] ?? null;
+        
+        if (!\$id) {
+            \$this->error('ID non fourni');
+            return;
+        }
+        
+        \$data = \$_POST;
+        
+        if (empty(\$data)) {
+            \$this->error('Aucune donnée fournie');
+            return;
+        }
+        
+        \$model = new \Models\\{$modelName}(\$this->db);
+        \$result = \$model->update((int)\$id, \$data);
+        
+        if (\$result === true) {
+            \$this->success('@entity_name@ mis à jour avec succès');
+            \$this->redirection('/@route_name@/' . \$id);
+        } else {
+            \$this->error('Erreur lors de la mise à jour: ' . \$result);
+        }
+    }
+
+    /**
+     * Supprime un @entity_name@
+     * 
+     * @param mixed ...\$args Arguments de la route
+     * @return void
+     */
+    public function destroy(...\$args)
+    {
+        \$id = \$args['id'] ?? \$args[0] ?? null;
+        
+        if (!\$id) {
+            \$this->error('ID non fourni');
+            return;
+        }
+        
+        \$model = new \Models\\{$modelName}(\$this->db);
+        \$result = \$model->delete((int)\$id);
+        
+        if (\$result) {
+            \$this->success('@entity_name@ supprimé avec succès');
+            \$this->redirection('/@route_name@');
+        } else {
+            \$this->error('Erreur lors de la suppression');
+        }
+    }
+
+    /**
+     * Méthode API pour récupérer tous les @entity_name@ en JSON
+     * 
+     * @param mixed ...\$args Arguments de la route
+     * @return void
+     */
+    public function apiIndex(...\$args)
+    {
+        \$model = new \Models\\{$modelName}(\$this->db);
+        \$data = \$model->findAll();
+        
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => true,
+            'data' => \$data,
+            'count' => count(\$data)
+        ]);
+    }
+
+    /**
+     * Méthode API pour récupérer un @entity_name@ spécifique en JSON
+     * 
+     * @param mixed ...\$args Arguments de la route
+     * @return void
+     */
+    public function apiShow(...\$args)
+    {
+        \$id = \$args['id'] ?? \$args[0] ?? null;
+        
+        if (!\$id) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'error' => 'ID non fourni']);
+            return;
+        }
+        
+        \$model = new \Models\\{$modelName}(\$this->db);
+        \$item = \$model->findById((int)\$id);
+        
+        if (!\$item) {
+            http_response_code(404);
+            echo json_encode(['success' => false, 'error' => '@entity_name@ non trouvé']);
+            return;
+        }
+        
+        echo json_encode(['success' => true, 'data' => \$item]);
+    }
+}
+PHP;
+
+        $entityName = strtolower(str_replace(['Controller', 'Model'], '', $className));
+        $singularName = rtrim($entityName, 's');
+        $variableName = $entityName;
+        
+        $template = str_replace(
+            [
+                '@date@',
+                '@entity_name@',
+                '@singular_name@',
+                '@view_folder@',
+                '@variable_name@',
+                '@route_name@'
+            ],
+            [
+                date('Y-m-d H:i:s'),
+                $entityName,
+                $singularName,
+                $viewFolder,
+                $variableName,
+                $entityName
+            ],
+            $template
+        );
+        
+        // Crée le dossier controllers s'il n'existe pas
+        if (!is_dir(dirname($fileName))) {
+            mkdir(dirname($fileName), 0755, true);
+        }
+        
+        file_put_contents($fileName, $template);
+        $this->info("✓ Contrôleur créé: controllers/{$className}.php");
+    }
+    
+    private function getTableName(string $className): string
+    {
+        // Convertit CamelCase en snake_case pour le nom de table
+        $name = preg_replace('/Model$/i', '', $className);
+        $name = preg_replace('/(?<!^)[A-Z]/', '_$0', $name);
+        return strtolower($name);
+    }
+    
+    public function listCommands(): void
+    {
+        $this->info("AUTOMAT - Outil de ligne de commande MVC");
+        $this->info("========================================\n");
+        
+        foreach ($this->commands as $name => $command) {
+            $this->info(sprintf("  %-20s %s", $name, $command['description']));
+        }
+        
+        $this->info("\nExemples:");
+        $this->info("  php automat create:model User");
+        $this->info("  php automat create:controller ArticleController");
+        $this->info("  php automat create:model Produit,Commande,Client");
+        $this->info("  php automat create:controller UserController,ApiController,AdminController");
+    }
+    
+    public function showHelp(array $argv): void
+    {
+        $command = $argv[2] ?? null;
+        
+        if ($command && isset($this->commands[$command])) {
+            $this->info("Aide pour: $command");
+            $this->info("Description: " . $this->commands[$command]['description']);
+            $this->info("Usage: php automat " . $this->commands[$command]['usage']);
+            $this->info("Exemple: php automat $command Nom");
+        } else {
+            $this->listCommands();
+        }
+    }
+    
+    private function info(string $message): void
+    {
+        echo "\033[34m[INFO]\033[0m $message\n";
+    }
+    
+    private function success(string $message): void
+    {
+        echo "\033[32m[SUCCESS]\033[0m $message\n";
+    }
+    
+    private function warning(string $message): void
+    {
+        echo "\033[33m[WARNING]\033[0m $message\n";
+    }
+    
+    private function error(string $message): void
+    {
+        echo "\033[31m[ERROR]\033[0m $message\n";
+    }
+}
+
+// Point d'entrée
+if (php_sapi_name() === 'cli') {
+    $automat = new Automat();
+    $automat->run($argv);
+} else {
+    echo "Cet outil doit être exécuté en ligne de commande.\n";
+}
