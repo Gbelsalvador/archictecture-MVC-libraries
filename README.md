@@ -26,6 +26,25 @@ Vue d'ensemble des dossiers
 - `views/` : vues PHP
 - `utils/` : utilitaires (Mailer, Security, UploadHandler)
 
+**Automat (CLI)** : Outil en ligne de commande fourni à la racine (`automat`) pour générer rapidement des modèles et des contrôleurs.
+
+- **Emplacement**: le fichier exécutable `automat` se trouve à la racine du projet.
+- **Usage**: lancez-le via PHP en CLI:
+
+```bash
+php automat list
+php automat create:model NomModel
+php automat create:controller NomController
+```
+
+- **Exemples**:
+	- `php automat create:model Produit,Commande,Utilisateur` — crée plusieurs modèles séparés par des virgules.
+	- `php automat create:controller ArticleController,ApiController` — crée plusieurs contrôleurs en une commande.
+
+- **Comportement**: le script crée les fichiers dans `models/` et `controllers/`, ajoute des templates basiques (méthodes CRUD) et affiche des informations en sortie.
+
+> Remarque: exécutez ces commandes en CLI (Windows PowerShell, CMD, ou terminal sous Linux/macOS). Sur Unix-like, vous pouvez rendre `automat` exécutable (`chmod +x automat`) et l'exécuter directement (`./automat`).
+
 Créer un nouveau Model
 
 1. Placer le fichier dans `models/` et utiliser le namespace `Models`.
