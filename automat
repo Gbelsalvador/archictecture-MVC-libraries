@@ -177,7 +177,7 @@ class {$className}
     {
         \$pdo = \$this->db->getPDO();
         \$stmt = \$pdo->prepare('SELECT * FROM @table_name@ WHERE id = :id');
-        \$stmt->execute([':id' => \$id]);
+        \$stmt->execute(['id' => \$id]);
         \$result = \$stmt->fetch(\PDO::FETCH_ASSOC);
         
         return \$result ?: null;
@@ -223,7 +223,7 @@ class {$className}
             \$sql = "UPDATE @table_name@ SET \$setClause WHERE id = :id";
             \$stmt = \$pdo->prepare(\$sql);
             
-            \$data[':id'] = \$id;
+            \$data['id'] = \$id;
             return \$stmt->execute(\$data);
         } catch (\PDOException \$e) {
             return \$e->getMessage();
@@ -240,8 +240,7 @@ class {$className}
     {
         \$pdo = \$this->db->getPDO();
         \$stmt = \$pdo->prepare('DELETE FROM @table_name@ WHERE id = :id');
-        return \$stmt->execute([':id' => \$id]);
-    }
+        return \$stmt->execute(['id' => \$id]);
     }
 }
 PHP;
@@ -277,6 +276,9 @@ PHP;
         
         $modelName = str_replace('Controller', 'Model', $className);
         $viewFolder = strtolower(str_replace('Controller', '', $className));
+        if (!str_ends_with($viewFolder, 's')) {
+            $viewFolder .= 's';
+        }
         
         $template = <<<PHP
 <?php
@@ -478,8 +480,7 @@ class {$className} extends Controller
         \$model = new \Models\\{$modelName}(\$this->db);
         \$data = \$model->findAll();
         
-        header('Content-Type: application/json');
-        echo json_encode([
+        \$this->jsonResponse([
             'success' => true,
             'data' => \$data,
             'count' => count(\$data)
@@ -497,8 +498,7 @@ class {$className} extends Controller
         \$id = \$args['id'] ?? \$args[0] ?? null;
         
         if (!\$id) {
-            http_response_code(400);
-            echo json_encode(['success' => false, 'error' => 'ID non fourni']);
+            \$this->jsonError('ID non fourni', 400);
             return;
         }
         
@@ -506,12 +506,11 @@ class {$className} extends Controller
         \$item = \$model->findById((int)\$id);
         
         if (!\$item) {
-            http_response_code(404);
-            echo json_encode(['success' => false, 'error' => '@entity_name@ non trouvé']);
+            \$this->jsonError('@entity_name@ non trouvé', 404);
             return;
         }
-        
-        echo json_encode(['success' => true, 'data' => \$item]);
+
+        \$this->jsonResponse(['success' => true, 'data' => \$item]);
     }
 }
 PHP;
@@ -519,6 +518,10 @@ PHP;
         $entityName = strtolower(str_replace(['Controller', 'Model'], '', $className));
         $singularName = rtrim($entityName, 's');
         $variableName = $entityName;
+        $routeName = $entityName;
+        if (!str_ends_with($routeName, 's')) {
+            $routeName .= 's';
+        }
         
         $template = str_replace(
             [
@@ -535,7 +538,7 @@ PHP;
                 $singularName,
                 $viewFolder,
                 $variableName,
-                $entityName
+                $routeName
             ],
             $template
         );

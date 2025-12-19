@@ -37,4 +37,46 @@ class Controller {
     public function isConnected() {
         return $this->db->getPDO() instanceof \PDO;
     }
+
+    public function success($message) {
+            echo "<h1>Succès : </h1><p>" . htmlspecialchars($message, ENT_QUOTES) . "</p>";
+        }
+
+    public function error($message) {
+            echo "<h1>Erreur : </h1><p>" . htmlspecialchars($message, ENT_QUOTES) . "</p>";
+        }
+
+        /**
+         * Réponse JSON générique
+         *
+         * @param mixed $data Données à renvoyer
+         * @param int $status Code HTTP
+         * @return void
+         */
+        public function jsonResponse($data, int $status = 200)
+        {
+            http_response_code($status);
+            header('Content-Type: application/json');
+            echo json_encode($data);
+            exit;
+        }
+
+        /**
+         * Réponse JSON pour succès simple
+         */
+        public function jsonSuccess(string $message, array $extra = [], int $status = 200)
+        {
+            $payload = array_merge(['success' => true, 'message' => $message], $extra);
+            $this->jsonResponse($payload, $status);
+        }
+
+        /**
+         * Réponse JSON pour erreur
+         */
+        public function jsonError(string $message, int $status = 400, array $extra = [])
+        {
+            $payload = array_merge(['success' => false, 'error' => $message], $extra);
+            $this->jsonResponse($payload, $status);
+        }
+
 }
