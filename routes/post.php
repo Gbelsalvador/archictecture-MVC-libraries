@@ -1,8 +1,6 @@
 <?php 
 
-    Router\Router::post('/',function() use ($core){
-        $core->http_json_status_methode(200,'api fonctionnelle !!!!!!', ['datas' => 'des datas']);
-    });
+    Router\Router::post('/', [Controllers\ApiController::class, 'rootPost']);
 
     Router\Router::post('/api/echo', [Controllers\ApiController::class, 'echoPost']);
 

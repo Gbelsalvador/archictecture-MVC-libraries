@@ -1,186 +1,293 @@
-# Architecture MVC - Guide d'utilisation
+# MVC Architecture for PHP APIs and Server-Rendered Applications
 
-Ce dépôt fournit une architecture minimale MVC pour construire une API/mini-application PHP.
+`architecture-MVC-libraries` is a lightweight PHP MVC foundation designed for small to medium-sized APIs and server-rendered applications.
 
-Prérequis
-- PHP 8+
+The project provides:
+
+- a front controller in `public/`
+- a routing layer based on AltoRouter
+- controller and model base classes
+- request, response, and authentication services
+- helper utilities for uploads, mail, and security
+- a CLI generator named `automat`
+
+The current architecture favors:
+
+- explicit controller dispatch
+- centralized JSON responses
+- lazy database access
+- environment-driven configuration
+- a clear separation between HTTP concerns and business logic
+
+## Requirements
+
+- PHP 8.0 or higher
 - Composer
-- Serveur web local (ex: PHP built-in, Apache)
+- A local or remote MySQL-compatible database
 
-Installation rapide
+## Getting Started
 
 ```bash
 composer install
 composer dump-autoload
 cp .env.example .env
-# éditer .env pour renseigner DB_*, JWT_SECRET, MAIL_FROM, et SMTP_* si nécessaire
+```
+
+Update `.env` with your runtime configuration:
+
+- `DB_HOST`
+- `DB_NAME`
+- `DB_USER`
+- `DB_PASS`
+- `JWT_SECRET`
+- `CORS_ALLOWED_ORIGINS`
+- SMTP variables if mail delivery is required
+
+Start the application locally:
+
+```bash
 php -S localhost:8000 -t public
 ```
 
-Vue d'ensemble des dossiers
-- `public/` : point d'entrée (`public/index.php`)
-- `core/` : classes utilitaires (ex: `Core\Core`)
-- `router/` : wrapper pour AltoRouter (`Router\Router`)
-- `controllers/` : contrôleurs (ex: `Controller`, `ApiController`)
-- `models/` : modèles (ex: `Models\DataModel`, `Models\UserModel`)
-- `views/` : vues PHP
-- `utils/` : utilitaires (Mailer, Security, UploadHandler)
+## Project Structure
 
-**Automat (CLI)** : Outil en ligne de commande fourni à la racine (`automat`) pour générer rapidement des modèles et des contrôleurs.
-
-- **Emplacement**: le fichier exécutable `automat` se trouve à la racine du projet.
-- **Usage**: lancez-le via PHP en CLI:
-
-```bash
-php automat list
-php automat create:model NomModel
-php automat create:controller NomController
+```text
+config/       Environment and application configuration
+controllers/  Base controller and application controllers
+core/         Request, response, auth, config, and bootstrapping services
+models/       Data access classes and domain models
+public/       HTTP entry point
+router/       AltoRouter wrapper and controller dispatcher
+routes/       Route declarations grouped by HTTP verb
+tests/        Lightweight test runner and architecture checks
+utils/        Reusable helpers (security, uploads, mail)
+views/        PHP templates for server-rendered pages
+automat       CLI generator for models and controllers
 ```
 
-- **Exemples**:
-	- `php automat create:model Produit,Commande,Utilisateur` — crée plusieurs modèles séparés par des virgules.
-	- `php automat create:controller ArticleController,ApiController` — crée plusieurs contrôleurs en une commande.
+## Request Lifecycle
 
-- **Comportement**: le script crée les fichiers dans `models/` et `controllers/`, ajoute des templates basiques (méthodes CRUD) et affiche des informations en sortie.
+The runtime flow is intentionally simple and explicit:
 
-> Remarque: exécutez ces commandes en CLI (Windows PowerShell, CMD, ou terminal sous Linux/macOS). Sur Unix-like, vous pouvez rendre `automat` exécutable (`chmod +x automat`) et l'exécuter directement (`./automat`).
+1. `public/index.php` loads Composer, environment variables, and core services.
+2. `Core\Core` configures request handling, CORS, authentication helpers, and route loading.
+3. `routes/*.php` register route definitions with `Router\Router`.
+4. `Router\Router` resolves the incoming request and dispatches the matched controller action.
+5. Controllers read input through `Core\Request`, access persistence through models, and send output through `Core\Response`.
 
-Créer un nouveau Model
+This keeps the HTTP pipeline understandable while remaining extensible for future middleware or service container work.
 
-1. Placer le fichier dans `models/` et utiliser le namespace `Models`.
-2. Hériter ou utiliser `Models\DataModel` pour accéder à la base :
+## Routing
 
-Exemple minimal :
+Routes are declared by HTTP verb in the `routes/` directory and now use controller targets directly:
+
+```php
+Router\Router::get('/api', [Controllers\ApiController::class, 'index']);
+Router\Router::post('/api/articles', [Controllers\ArticleController::class, 'apiStore']);
+Router\Router::put('/api/articles/[i:id]', [Controllers\ArticleController::class, 'apiUpdate']);
+Router\Router::delete('/api/articles/[i:id]', [Controllers\ArticleController::class, 'apiDestroy']);
+```
+
+This pattern is preferred over route closures for application endpoints because it is:
+
+- easier to test
+- more consistent
+- easier to document
+- better aligned with controller-based frameworks
+
+## Controllers
+
+Application controllers extend `Controllers\Controller`.
+
+The base controller exposes:
+
+- `render()` for PHP views
+- `jsonResponse()`, `jsonSuccess()`, `jsonError()` for API responses
+- `redirection()` for redirects
+- injected `DataModel`, `Response`, and `Request` dependencies
+
+Example:
 
 ```php
 <?php
-namespace Models;
 
-class ArticleModel
-{
-	protected DataModel $db;
-
-	public function __construct(DataModel $db = null)
-	{
-		$this->db = $db ?? new DataModel();
-	}
-
-	public function findAll(): array
-	{
-		$pdo = $this->db->getPDO();
-		$stmt = $pdo->query('SELECT * FROM articles');
-		return $stmt->fetchAll();
-	}
-}
-```
-
-Créer un nouveau Controller
-
-1. Placer le fichier dans `controllers/` et utiliser le namespace `Controllers`.
-2. Étendre `Controllers\Controller` pour bénéficier de `render()`, `redirection()` et `$this->db`.
-
-Exemple minimal :
-
-```php
-<?php
 namespace Controllers;
 
 class ArticleController extends Controller
 {
-	public function index(...$args)
-	{
-		$model = new \Models\ArticleModel($this->db);
-		$articles = $model->findAll();
-		$this->render('articles/index', ['articles' => $articles]);
-	}
+    public function apiShow(array $params = []): void
+    {
+        $id = $params['id'] ?? null;
+        if (!$id) {
+            $this->jsonError('ID non fourni', 400);
+            return;
+        }
+
+        $model = new \Models\ArticleModel($this->db);
+        $article = $model->findById((int) $id);
+
+        if (!$article) {
+            $this->jsonError('Article non trouvé', 404);
+            return;
+        }
+
+        $this->jsonResponse([
+            'success' => true,
+            'data' => $article,
+        ]);
+    }
 }
 ```
 
-Créer une View
+## Request and Response Services
 
-Placer un fichier PHP dans `views/`, par ex. `views/articles/index.php` et utiliser les variables passées via `render()`.
+The `core/` layer centralizes HTTP behavior:
 
-Utiliser les routes
+- `Core\Request` reads JSON payloads, headers, request method, URI, and uploaded files
+- `Core\Response` standardizes JSON output and status handling
+- `Core\AuthService` validates bearer tokens
+- `Core\AppConfig` reads runtime configuration from environment variables
 
-- Déclarez vos routes dans `routes/get.php`, `routes/post.php`, etc. Exemple pour AltoRouter :
+This makes controllers thinner and avoids repeating low-level HTTP logic throughout the codebase.
 
-```php
-Router\Router::get('/articles', function() use ($core) {
-	$controller = new Controllers\ArticleController();
-	$controller->index();
-});
-```
+## Database Access
 
-Utilisation du token (JWT)
+`Models\DataModel` manages the PDO connection.
 
-- Le projet contient `Models\UserModel::verifyJWT($token)` qui vérifie un token HS256 utilisant la clé `JWT_SECRET` dans `.env`.
-- Pour récupérer l'ID utilisateur depuis un header Bearer, utilisez `Core\Core::getArtisteIdFromToken()` ou `requireAuthenticatedUserId()`.
+The connection is now lazy:
 
-Génération d'un token (exemple simple côté serveur lors de l'authentification) :
+- the application no longer opens a database connection during bootstrap
+- the connection is created only when `getPDO()` is first called
 
-```php
-$payload = ['user_id' => $userId, 'exp' => time() + 3600];
-$header = base64_encode(json_encode(['alg'=>'HS256','typ'=>'JWT']));
-$body = base64_encode(json_encode($payload));
-$sig = hash_hmac('sha256', "$header.$body", $_ENV['JWT_SECRET'] ?? 'dev_secret', true);
-$token = rtrim(strtr(base64_encode($header), '+/', '-_'), '=') . '.' .
-		 rtrim(strtr(base64_encode($body), '+/', '-_'), '=') . '.' .
-		 rtrim(strtr(base64_encode($sig), '+/', '-_'), '=');
-```
+This allows non-database endpoints to remain functional even if the database is temporarily unavailable.
 
-Mailer (`Utils\Mailer`)
+## Authentication
 
-- Utilisez `Utils\Mailer::send($to, $subject, $body, $options)`.
-- Supporte PHPMailer (si installé via Composer) et retombe sur `mail()` sinon.
-- Config via `.env`: `MAIL_FROM`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_PORT`, `SMTP_SECURE`.
+JWT validation is handled by `Core\AuthService`.
 
-Exemple d'envoi simple :
+The current implementation:
+
+- validates the token structure
+- enforces `HS256`
+- verifies the signature
+- checks time-based claims such as `exp`, `nbf`, and `iat`
+- refuses insecure fallback secrets
+
+To require authentication in an endpoint, use:
 
 ```php
-use Utils\Mailer;
-Mailer::send('user@example.com', 'Test', '<b>Bonjour</b>', ['is_html' => true]);
+$userId = $core->requireAuthenticatedUserId();
 ```
 
-Upload de fichiers (`Utils\UploadHandler`)
-
-- Instancier `UploadHandler` et appeler `handle('field_name')` sur une requête `multipart/form-data`.
-- Exemple :
+or call:
 
 ```php
-$u = new Utils\UploadHandler(__DIR__ . '/../uploads', 5_000_000, ['image/jpeg','image/png'], ['jpg','jpeg','png']);
-$res = $u->handle('file');
-if ($res['success']) { /* fichier en $res['path'] */ }
+$userId = $core->getArtisteIdFromToken();
 ```
 
-Sécurité (`Utils\Security`)
+## File Uploads
 
-- `Security::sanitize($input)` : nettoie les entrées utilisateur.
-- `Security::hashPassword()` / `Security::verifyPassword()` : gestion sécurisée des mots de passe.
-- `Security::generateCsrfToken()` / `verifyCsrfToken()` : tokens CSRF stockés en session.
-- `Security::rateLimit()` : simple limiteur de requêtes en session (pour usage léger).
+`Utils\UploadHandler` provides a basic but safer upload workflow:
 
-Exemples courts :
+- optional MIME and extension allowlists
+- file size limitation
+- random file naming
+- validation with `is_uploaded_file()`
+- public-facing relative path in the returned payload
+
+Example:
 
 ```php
-use Utils\Security;
-$safe = Security::sanitize($_POST['name'] ?? '');
-$hash = Security::hashPassword('secret');
-Security::verifyPassword('secret', $hash);
+use Utils\UploadHandler;
+
+$uploader = new UploadHandler(
+    __DIR__ . '/../uploads',
+    5_000_000,
+    ['image/jpeg', 'image/png'],
+    ['jpg', 'jpeg', 'png']
+);
+
+$result = $uploader->handle('file');
 ```
 
-Bonnes pratiques
+## Security Utilities
 
-- Ne stockez jamais `JWT_SECRET` ou mots de passe en clair dans le dépôt. Utilisez `.env` et variables d'environnement.
-- Validez et limitez les types/taille d'upload côté serveur.
-- Activez TLS pour SMTP (`SMTP_SECURE` = tls/ssl) en production.
-- Versionnez `composer.json` et `composer.lock` ensemble et utilisez `composer require` pour ajouter des dépendances.
+`Utils\Security` contains helper methods for:
 
-Support & tests
+- input sanitation
+- HTML escaping
+- password hashing and verification
+- CSRF token generation and validation
+- session-based rate limiting
 
-- Pour tester les routes, démarrez le serveur et utilisez `curl` ou Postman.
-- Exemple :
+Recommended usage:
+
+- sanitize input when normalizing user data
+- escape output when rendering HTML
+- do not store HTML-escaped data in the database
+
+## CORS Configuration
+
+CORS is environment-driven through `CORS_ALLOWED_ORIGINS`.
+
+Example:
+
+```env
+CORS_ALLOWED_ORIGINS=http://localhost:8000,http://localhost:3000
+```
+
+In non-production environments, the application can fall back to permissive behavior when no explicit origin is configured. In production, define allowed origins explicitly.
+
+## Code Generation with `automat`
+
+`automat` is a CLI helper that scaffolds models and controllers:
 
 ```bash
-curl http://localhost:8000/api
-curl -X POST -H "Content-Type: application/json" -d '{"foo":"bar"}' http://localhost:8000/api/echo
+php automat list
+php automat create:model Article
+php automat create:controller ArticleController
 ```
+
+Generated controllers include:
+
+- classic MVC actions such as `index`, `show`, `create`, `store`, `edit`, `update`, `destroy`
+- API actions such as `apiIndex`, `apiShow`, `apiStore`, `apiUpdate`, `apiDestroy`
+- JSON-aware request reading through the injected `Request` object
+
+After generating a controller, `automat` also prints route examples using the controller-target style introduced in this architecture.
+
+## Testing
+
+A lightweight test runner is available:
+
+```bash
+php tests/run.php
+```
+
+The current test suite covers:
+
+- request JSON decoding
+- JWT validation behavior
+- controller dispatch through the router
+
+## Operational Notes
+
+- Do not commit real secrets to the repository.
+- Keep `composer.json` and `composer.lock` versioned together.
+- Do not edit `vendor/` manually.
+- Restrict `CORS_ALLOWED_ORIGINS` in production.
+- Use strong, non-default JWT secrets.
+- Validate upload types and sizes server-side even if the client already does.
+
+## Roadmap
+
+Natural next steps for this codebase are:
+
+- introduce a dedicated dependency container
+- add a richer automated test suite
+- formalize error handling for HTML responses
+- add middleware support for authentication and rate limiting
+
+## License
+
+No license file is currently provided in the repository. Add one before publishing or distributing the project externally.

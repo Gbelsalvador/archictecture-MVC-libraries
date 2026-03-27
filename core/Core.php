@@ -106,16 +106,8 @@ class Core
         return $userId;
     }
 
-    /**
-     * require_api_route_files
-     *
-     * @param Core $core : une instance de la classe est passé en params de la methode
-     * pour en affaire appel dans les fonctions anonymes lors de la creation d une route
-     * @return void
-     */
     public function require_api_route_files(): void
     {
-        $core = $this;
         require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'get.php';
         require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'post.php';
         require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'put.php';

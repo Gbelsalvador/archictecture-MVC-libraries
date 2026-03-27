@@ -1,116 +1,354 @@
-# Documentation Technique - Architecture MVC
+# Architecture Reference
 
-Ce document décrit la structure interne du projet, les responsabilités des fichiers principaux et les conventions à respecter.
+This document describes the runtime architecture, conventions, and extension points of the project.
 
-## Vue d'ensemble
+It is intended for contributors who need to understand how requests flow through the application and how new features should be implemented.
 
-Le projet suit une architecture MVC simple :
+## 1. Architectural Overview
 
-- `public/` : point d'entrée HTTP (routeur frontal).
-- `router/` : wrapper pour le routeur (AltoRouter).
-- `controllers/` : logique applicative, rend des vues ou des réponses API.
-- `models/` : accès aux données via `Models\DataModel` et modèles métiers.
-- `views/` : templates PHP pour l'affichage côté serveur.
-- `core/` : utilitaires et fonctions centrales (bootstrapping).
-- `utils/` : petites utilitaires (Mailer, Security, UploadHandler).
-- `vendor/` : dépendances Composer.
-- `automat` : CLI home-grown (génère modèles et contrôleurs à partir de templates).
+The application follows a lightweight MVC structure with explicit HTTP dispatch:
 
-## Fichiers et responsabilités (détails)
+- `public/index.php` acts as the front controller
+- `router/Router.php` wraps AltoRouter and dispatches controller targets
+- `routes/*.php` define routes by HTTP verb
+- `controllers/` contains entry points for application and API behavior
+- `models/` encapsulates persistence concerns
+- `views/` contains server-rendered templates
+- `core/` centralizes HTTP and cross-cutting services
+- `utils/` contains reusable infrastructure helpers
 
-- `public/index.php`
-  - Point d'entrée. Monte l'environnement, charge l'autoload, instancie le routeur et délègue les requêtes.
-  - Doit rester léger : uniquement bootstrap + dispatch.
+This architecture aims to keep the framework surface area small while preserving enough structure for maintainable application growth.
 
-- `router/Router.php`
-  - Wrapper autour d'AltoRouter. Définit des helpers statiques pour déclarer les routes.
-  - Les routes sont déclarées dans `routes/*.php` (GET/POST/PUT/DELETE).
+## 2. Runtime Flow
 
-- `controllers/controller.php` (classe `Controller`)
-  - Classe de base pour tous les contrôleurs.
-  - Propriétés : `protected DataModel $db` (injection/construction automatique).
-  - Méthodes principales :
-    - `render($view, $data = [])` : inclut un fichier de `views/` (lance une Exception si absent).
-    - `redirection($url)` : redirige (header ou script js si headers déjà envoyés) puis `exit`.
-    - `error($message)` / `success($message)` : sorties HTML pour erreurs/succès standards.
-    - `jsonResponse($data, $status = 200)` / `jsonSuccess()` / `jsonError()` : helpers JSON ajoutés pour les API.
-  - Remarque : `render()` attend un chemin type `folder/template`.
+### 2.1 Bootstrap
 
-- `controllers/ApiController.php`
-  - Exemple d'un contrôleur API : retourne généralement des tableaux (non rendu HTML).
-  - Pour les routes API, préférez utiliser `jsonResponse` / `jsonError`.
+`public/index.php` is responsible for:
 
-- `models/DataModel.php` (classe `DataModel`)
-  - Fournit la connexion PDO centralisée.
-  - Méthode `getPDO()` pour récupérer l'objet PDO (ou `null` si non connecté).
-  - Lit la configuration DB depuis `config/config.php`.
-  - Configuration PDO : erreurexception et fetch assoc par défaut.
+- loading Composer autoloading
+- loading `.env`
+- creating the `Response` and `Core` services
+- initializing the router
+- registering the controller dispatcher
+- loading route files
+- matching and dispatching the request
 
-- `models/*.php` (modèles métiers)
-  - Doivent se situer dans le namespace `Models`.
-  - `automat` génère des classes `XModel` avec méthodes CRUD (`findAll`, `findById`, `create`, `update`, `delete`).
-  - Les méthodes utilisent `$this->db->getPDO()` pour préparer/exécuter requêtes.
+Exceptions thrown during bootstrap or dispatch are converted into JSON error responses.
 
-- `views/` 
-  - Fichiers PHP rendus par `Controller::render()`.
-  - Convention : `views/<entities>/<template>.php`. `automat` génère `views` folder names au pluriel.
+### 2.2 Route Resolution
 
-- `automat` (CLI)
-  - Script PHP CLI à la racine (`automat`) pour générer rapidement des modèles et contrôleurs.
-  - Commandes principales : `create:model`, `create:controller`, `list`, `help`.
-  - Comportement des templates :
-    - Modèles générés : namespace `Models`, class `XModel`, méthodes CRUD et injections `DataModel`.
-    - Contrôleurs générés : extends `Controller`, méthodes REST-like (`index`, `show`, `create`, `store`, `edit`, `update`, `destroy`) et endpoints API (`apiIndex`, `apiShow`) qui utilisent `jsonResponse`/`jsonError`.
-    - `viewFolder` est généré au pluriel (ex: `tests`) et `route_name` est pluriel (`/tests`) pour cohérence.
-  - Limitations / points d'attention :
-    - `automat` ne génère pas automatiquement les fichiers de `views` par défaut (option `--with-views` non présente). Si vous appelez `render()` sans créer la vue, une Exception est lancée.
-    - Le CLI écrit directement dans `models/` et `controllers/` et écrase les fichiers existants en affichant un avertissement.
+`Router\Router` stores the AltoRouter instance and exposes helpers:
 
-- `utils/` 
-  - `Mailer.php`, `Security.php`, `UploadHandler.php` : utilitaires réutilisables.
-  - `Security` gère sanitation, hash/verify password, CSRF, etc.
+- `get()`
+- `post()`
+- `put()`
+- `delete()`
+- `origin()`
 
-## Conventions et recommandations
+Routes may point to:
 
-- Namespace : `Controllers` et `Models` pour les fichiers respectifs.
-- Nom des classes : `PascalCase`, suffixes `Controller` et `Model` pour générateur automatique.
-- Noms de vues : dossiers en minuscules et au pluriel pour regrouper les templates (ex: `views/articles/index.php`).
-- Routes : `/<resource>` pour index, `/<resource>/{id}` pour détail. `automat` utilise la version plurielle pour `route_name`.
-- Réponses API : utiliser `jsonResponse()` / `jsonError()` au sein des contrôleurs pour cohérence.
+- a closure
+- a controller target in the form `[ControllerClass::class, 'method']`
 
-## Bonnes pratiques pour le développement
+Controller targets are the preferred approach for production code.
 
-- Ne pas modifier `vendor/` directement. Utiliser `composer` pour gérer les dépendances.
-- Tester localement avec le serveur PHP :
+### 2.3 Controller Dispatch
 
-```bash
-composer install
-php -S localhost:8000 -t public
+The dispatcher configured in `public/index.php` delegates controller instantiation to `Core\Core::makeController()`.
+
+This ensures that each controller receives shared dependencies:
+
+- `Models\DataModel`
+- `Core\Response`
+- `Core\Request`
+
+The current implementation still uses direct instantiation and is intentionally simple, but it already provides a clear seam for future dependency injection improvements.
+
+## 3. Core Services
+
+### 3.1 `Core\AppConfig`
+
+Provides read access to environment variables and convenience helpers:
+
+- `env()`
+- `bool()`
+- `environment()`
+- `isProduction()`
+- `isDebug()`
+- `allowedOrigins()`
+
+Use this class whenever runtime behavior depends on environment configuration.
+
+### 3.2 `Core\Request`
+
+Encapsulates incoming HTTP request access.
+
+Responsibilities:
+
+- reading raw body content
+- decoding JSON payloads
+- reading server variables
+- retrieving the Authorization header
+- exposing request method and URI
+- exposing uploaded files
+
+Controllers should prefer this object over direct access to `php://input` or `$_SERVER`.
+
+### 3.3 `Core\Response`
+
+Standardizes JSON responses.
+
+Responsibilities:
+
+- setting HTTP status codes
+- setting JSON content type
+- encoding the payload
+- optionally terminating the request
+
+This service exists to keep response semantics consistent across controllers and infrastructure code.
+
+### 3.4 `Core\AuthService`
+
+Handles bearer token validation.
+
+Current guarantees:
+
+- validates the JWT structure
+- requires `HS256`
+- verifies the HMAC signature
+- validates temporal claims when present
+- refuses missing or placeholder secrets
+
+This service should be extended rather than bypassed if authentication rules evolve.
+
+### 3.5 `Core\Core`
+
+Acts as an orchestration service rather than a god object.
+
+Current responsibilities:
+
+- route loading
+- request/response wiring
+- CORS setup
+- authenticated user extraction
+- controller factory logic
+
+It should not absorb model or business logic.
+
+## 4. Controllers
+
+### 4.1 Base Controller
+
+`Controllers\Controller` is the base class for concrete controllers.
+
+It provides:
+
+- `render()` for HTML responses
+- `redirection()` for redirects
+- `jsonResponse()`, `jsonSuccess()`, `jsonError()` for APIs
+- access to `$this->db`
+- access to `$this->response`
+- access to `$this->request`
+
+### 4.2 Controller Design Rules
+
+When adding a controller:
+
+- keep HTTP orchestration in the controller
+- keep SQL and persistence in models
+- use `jsonError()` and `jsonResponse()` for API consistency
+- read JSON request bodies through `$this->request->json()`
+- avoid direct access to globals unless unavoidable
+
+### 4.3 Example Route-to-Controller Mapping
+
+```php
+Router\Router::get('/api/articles', [Controllers\ArticleController::class, 'apiIndex']);
+Router\Router::post('/api/articles', [Controllers\ArticleController::class, 'apiStore']);
+Router\Router::put('/api/articles/[i:id]', [Controllers\ArticleController::class, 'apiUpdate']);
+Router\Router::delete('/api/articles/[i:id]', [Controllers\ArticleController::class, 'apiDestroy']);
 ```
 
-- Pour créer un modèle + contrôleur avec `automat` :
+## 5. Models
 
-```bash
-php automat create:model Article
-php automat create:controller ArticleController
-```
+### 5.1 `Models\DataModel`
 
-- Après génération, créez les vues correspondantes dans `views/<resources>/` pour éviter les Exceptions.
+Provides a centralized PDO connection.
 
-## Notes sur sécurité et production
+Important characteristics:
 
-- Toujours configurer les credentials DB dans `config/config.php` ou via `.env` (ne pas committer de secrets).
-- Activer TLS pour SMTP en production.
-- Valider et limiter la taille/type d'uploads dans `UploadHandler`.
+- lazy connection initialization
+- environment-driven configuration via `config/config.php`
+- exception mode enabled
+- associative fetch mode enabled
 
-## Ajouts récents (2025-12-19)
+### 5.2 Domain Models
 
-- `automat` corrigé pour :
-  - générer des templates valides (fix d'accolades),
-  - uniformiser les bindings PDO (`['id' => $id]`),
-  - générer `viewFolder` et `route_name` au pluriel,
-  - utiliser `jsonResponse`/`jsonError` dans les méthodes API.
+Domain models belong in `models/` and should:
 
----
+- use the `Models` namespace
+- receive `DataModel` through the constructor when possible
+- keep SQL and persistence logic contained
+- return arrays or domain-shaped data structures
 
-Pour d'autres détails (exemples de code, extension des templates `automat`, tests), dites-moi ce que vous voulez approfondir et j'ajouterai des sections ou exemples supplémentaires.
+Avoid placing request parsing, response formatting, or authentication logic in models.
+
+## 6. Views
+
+Views remain simple PHP templates under `views/`.
+
+Convention:
+
+- `views/<resource>/<template>.php`
+
+Use `render('articles/index', [...])` from controllers to include them.
+
+For API-only controllers, do not render views; return JSON instead.
+
+## 7. Utilities
+
+### 7.1 `Utils\Security`
+
+Provides:
+
+- sanitation helpers
+- HTML escaping
+- password hashing and verification
+- CSRF token helpers
+- lightweight session rate limiting
+
+Design note:
+
+- sanitize on input normalization
+- escape on output rendering
+
+### 7.2 `Utils\UploadHandler`
+
+Provides a basic upload abstraction with:
+
+- target directory creation
+- size validation
+- MIME and extension allowlists
+- server-side upload validation
+- randomized file naming
+
+The returned file path is public-facing and relative, not the raw internal filesystem path.
+
+### 7.3 `Utils\Mailer`
+
+Provides a mail abstraction that:
+
+- uses PHPMailer when available
+- falls back to `mail()` otherwise
+- reads SMTP settings from the environment
+
+## 8. Route Organization
+
+Routes are split by verb:
+
+- `routes/get.php`
+- `routes/post.php`
+- `routes/put.php`
+- `routes/delete.php`
+
+This organization is acceptable for a small codebase.
+
+If the application grows significantly, consider evolving toward:
+
+- domain-based route files
+- grouped route registration
+- middleware-aware route definitions
+
+## 9. Code Generation with `automat`
+
+`automat` is the built-in scaffolding tool.
+
+### 9.1 Supported Commands
+
+- `php automat list`
+- `php automat help`
+- `php automat create:model Article`
+- `php automat create:controller ArticleController`
+
+### 9.2 Generated Model Capabilities
+
+Generated models include:
+
+- `findAll()`
+- `findById()`
+- `create()`
+- `update()`
+- `delete()`
+
+### 9.3 Generated Controller Capabilities
+
+Generated controllers include:
+
+- HTML-oriented actions: `index`, `show`, `create`, `store`, `edit`, `update`, `destroy`
+- API-oriented actions: `apiIndex`, `apiShow`, `apiStore`, `apiUpdate`, `apiDestroy`
+- request parsing through a shared `requestData()` helper
+
+The generator also prints route examples aligned with the controller-target routing style.
+
+## 10. Security Considerations
+
+### 10.1 JWT
+
+- never deploy with placeholder secrets
+- rotate secrets through environment configuration
+- validate bearer tokens through `AuthService`
+
+### 10.2 CORS
+
+- configure `CORS_ALLOWED_ORIGINS` explicitly in production
+- avoid broad `*` policies for authenticated frontends
+
+### 10.3 Uploads
+
+- enforce extension and MIME allowlists
+- keep upload directories out of sensitive paths
+- do not trust client-provided filenames
+
+### 10.4 Error Handling
+
+- the front controller converts uncaught exceptions to JSON
+- use `APP_DEBUG=false` in production
+
+## 11. Testing Strategy
+
+The repository currently includes a lightweight test runner in `tests/run.php`.
+
+Covered concerns:
+
+- JSON request decoding
+- JWT acceptance and rejection behavior
+- controller dispatch through the router
+
+Recommended next additions:
+
+- controller behavior tests
+- model integration tests
+- route coverage for generated CRUD controllers
+
+## 12. Recommended Contribution Rules
+
+When extending the project:
+
+- keep bootstrap logic inside `public/index.php` minimal
+- add behavior to services before duplicating logic in controllers
+- prefer controller targets over route closures
+- keep models focused on persistence
+- document new environment variables in `.env.example`
+- update `README.md` and this document when architecture changes materially
+
+## 13. Future Improvements
+
+The current architecture is intentionally lightweight, but the most natural next improvements are:
+
+- a proper dependency injection container
+- middleware support
+- richer exception mapping
+- stronger typed DTOs or request validators
+- a dedicated test framework configuration
+
+The present structure is already a strong foundation for these upgrades because responsibilities are now better separated than in the earlier version of the project.
