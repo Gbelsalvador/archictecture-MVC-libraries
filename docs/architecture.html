@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Architecture Reference - Architecture MVC Libraries</title>
+    <meta name="description" content="Architecture reference for the architecture-MVC-libraries project.">
+    <style>
+        :root{--bg:#f2efe9;--panel:#fffdf9;--ink:#172026;--muted:#5c6871;--line:#ddd5c8;--accent:#9a3412;--accent-dark:#7c2d12;--accent-soft:#ffedd5;--code-bg:#182126;--code-ink:#eff7f4;--shadow:0 18px 45px rgba(23,32,38,.08);--radius:22px;--max:1180px}
+        *{box-sizing:border-box}
+        body{margin:0;color:var(--ink);font-family:Georgia,"Times New Roman",serif;line-height:1.7;background:radial-gradient(circle at top right,rgba(154,52,18,.12),transparent 24%),radial-gradient(circle at top left,rgba(30,64,175,.10),transparent 18%),linear-gradient(180deg,#f9f6f0 0%,var(--bg) 100%)}
+        a{color:var(--accent-dark);text-decoration:none} a:hover{text-decoration:underline}
+        .shell{width:min(var(--max),calc(100% - 32px));margin:0 auto}
+        .topbar{position:sticky;top:0;z-index:20;background:rgba(255,253,249,.88);backdrop-filter:blur(10px);border-bottom:1px solid rgba(221,213,200,.85)}
+        .topbar-inner{display:flex;justify-content:space-between;align-items:center;gap:18px;padding:16px 0;font-family:Arial,Helvetica,sans-serif}
+        .brand{display:flex;align-items:center;gap:12px;font-size:.95rem;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+        .brand-mark{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;color:#fff;font-weight:700;background:linear-gradient(135deg,var(--accent) 0%,#7c3aed 100%);box-shadow:var(--shadow)}
+        .nav{display:flex;gap:18px;flex-wrap:wrap}
+        .hero{padding:56px 0 28px}
+        .hero-card,.section-card{background:var(--panel);border:1px solid var(--line);border-radius:28px;box-shadow:var(--shadow)}
+        .hero-card{padding:40px}
+        .eyebrow{display:inline-block;margin-bottom:14px;padding:8px 12px;border-radius:999px;font-family:Arial,Helvetica,sans-serif;font-size:.8rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-dark);background:var(--accent-soft)}
+        h1,h2,h3{line-height:1.12;margin:0 0 14px} h1{font-size:clamp(2.4rem,4vw,4rem)} h2{font-size:clamp(1.55rem,2.5vw,2.25rem)} h3{font-size:1.15rem}
+        .hero p,.muted{color:var(--muted)}
+        .layout{display:grid;grid-template-columns:280px minmax(0,1fr);gap:24px;padding-bottom:52px}
+        .sidebar,.content>section{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow)}
+        .sidebar{position:sticky;top:90px;align-self:start;padding:22px;font-family:Arial,Helvetica,sans-serif}
+        .sidebar h3{margin-bottom:12px}
+        .toc{display:grid;gap:10px} .toc a{color:var(--ink);font-size:.95rem}
+        .content{display:grid;gap:20px} .content>section{padding:28px}
+        .list{margin:0;padding-left:18px} .list li+li{margin-top:8px}
+        pre{margin:0;padding:18px;overflow-x:auto;border-radius:18px;background:var(--code-bg);color:var(--code-ink);font-size:.92rem;line-height:1.55}
+        code{font-family:Consolas,"Courier New",monospace} :not(pre)>code{padding:2px 7px;border-radius:8px;background:rgba(154,52,18,.08);color:var(--accent-dark)}
+        .footer{padding:0 0 42px;color:var(--muted);font-family:Arial,Helvetica,sans-serif;font-size:.92rem}
+        @media (max-width:980px){.layout{grid-template-columns:1fr}.sidebar{position:static}}
+        @media (max-width:640px){.topbar-inner{flex-direction:column;align-items:flex-start}.hero-card,.content>section,.sidebar{padding:22px}}
+    </style>
+</head>
+<body>
+    <header class="topbar">
+        <div class="shell topbar-inner">
+            <div class="brand"><div class="brand-mark">ARC</div><div>Architecture Reference</div></div>
+            <nav class="nav" aria-label="Primary">
+                <a href="index.html">Documentation Home</a>
+                <a href="#overview">Overview</a>
+                <a href="#core-services">Core</a>
+                <a href="#controllers">Controllers</a>
+                <a href="#security">Security</a>
+                <a href="#testing">Testing</a>
+            </nav>
+        </div>
+    </header>
+    <main class="shell">
+        <section class="hero">
+            <div class="hero-card">
+                <div class="eyebrow">Contributor Guide</div>
+                <h1>Runtime architecture, conventions, and extension points.</h1>
+                <p>This reference is intended for contributors who need to understand how requests move through the application, where responsibilities belong, and how to extend the project without reintroducing coupling.</p>
+            </div>
+        </section>
+        <div class="layout">
+            <aside class="sidebar">
+                <h3>Contents</h3>
+                <nav class="toc" aria-label="Table of contents">
+                    <a href="#overview">1. Architectural Overview</a>
+                    <a href="#runtime-flow">2. Runtime Flow</a>
+                    <a href="#core-services">3. Core Services</a>
+                    <a href="#controllers">4. Controllers</a>
+                    <a href="#models">5. Models</a>
+                    <a href="#views">6. Views</a>
+                    <a href="#utilities">7. Utilities</a>
+                    <a href="#routes">8. Route Organization</a>
+                    <a href="#generator">9. Code Generation</a>
+                    <a href="#security">10. Security</a>
+                    <a href="#testing">11. Testing</a>
+                    <a href="#contribution">12. Contribution Rules</a>
+                    <a href="#future">13. Future Improvements</a>
+                </nav>
+            </aside>
+            <div class="content">
+                <section id="overview"><h2>1. Architectural Overview</h2><p class="muted">The application follows a lightweight MVC structure with explicit HTTP dispatch.</p><ul class="list"><li><code>public/index.php</code> is the front controller.</li><li><code>router/Router.php</code> wraps AltoRouter and dispatches controller targets.</li><li><code>routes/*.php</code> define routes by HTTP verb.</li><li><code>controllers/</code> contains application and API entry points.</li><li><code>models/</code> encapsulates persistence concerns.</li><li><code>core/</code> centralizes request, response, auth, and configuration services.</li><li><code>utils/</code> contains reusable infrastructure helpers.</li></ul></section>
+                <section id="runtime-flow"><h2>2. Runtime Flow</h2><h3>2.1 Bootstrap</h3><ul class="list"><li>Load Composer autoloading.</li><li>Load environment variables.</li><li>Create the core response and orchestration services.</li><li>Initialize the router and controller dispatcher.</li><li>Load route files and dispatch the request.</li></ul><h3>2.2 Route Resolution</h3><p class="muted">Routes may point either to a closure or to a controller target such as <code>[ControllerClass::class, 'method']</code>. The direct controller target is the recommended production style.</p><h3>2.3 Controller Dispatch</h3><p class="muted">Controller instances are built through <code>Core\Core::makeController()</code>, which injects shared request and response objects and provides a clean seam for future dependency injection improvements.</p></section>
+                <section id="core-services"><h2>3. Core Services</h2><h3><code>Core\AppConfig</code></h3><p class="muted">Provides access to environment variables and helpers for environment, debug mode, and allowed origins.</p><h3><code>Core\Request</code></h3><p class="muted">Encapsulates raw body access, JSON decoding, headers, method, URI, and uploaded files.</p><h3><code>Core\Response</code></h3><p class="muted">Standardizes JSON status codes, output, and optional request termination.</p><h3><code>Core\AuthService</code></h3><p class="muted">Validates bearer tokens, requires <code>HS256</code>, verifies signatures, and checks temporal claims.</p><h3><code>Core\Core</code></h3><p class="muted">Acts as an orchestration layer for route loading, CORS, authenticated user extraction, and controller creation.</p></section>
+                <section id="controllers"><h2>4. Controllers</h2><p class="muted"><code>Controllers\Controller</code> is the base class for concrete controllers.</p><ul class="list"><li>Keep HTTP orchestration in controllers.</li><li>Keep SQL and persistence in models.</li><li>Use <code>jsonResponse()</code> and <code>jsonError()</code> for API consistency.</li><li>Read JSON bodies through <code>$this-&gt;request-&gt;json()</code>.</li></ul><pre><code>Router\Router::get('/api/articles', [Controllers\ArticleController::class, 'apiIndex']);
+Router\Router::post('/api/articles', [Controllers\ArticleController::class, 'apiStore']);
+Router\Router::put('/api/articles/[i:id]', [Controllers\ArticleController::class, 'apiUpdate']);
+Router\Router::delete('/api/articles/[i:id]', [Controllers\ArticleController::class, 'apiDestroy']);</code></pre></section>
+                <section id="models"><h2>5. Models</h2><h3><code>Models\DataModel</code></h3><ul class="list"><li>Provides centralized PDO access.</li><li>Initializes lazily.</li><li>Reads database settings from <code>config/config.php</code>.</li><li>Uses exception mode and associative fetch mode.</li></ul><h3>Domain Models</h3><p class="muted">Domain models should remain focused on persistence. Avoid placing request parsing, response formatting, or authentication logic in models.</p></section>
+                <section id="views"><h2>6. Views</h2><p class="muted">Views remain standard PHP templates under <code>views/</code>, using the convention <code>views/&lt;resource&gt;/&lt;template&gt;.php</code>. Use <code>render('articles/index', [...])</code> from controllers. API-only endpoints should return JSON instead of rendering views.</p></section>
+                <section id="utilities"><h2>7. Utilities</h2><h3><code>Utils\Security</code></h3><p class="muted">Provides sanitation, HTML escaping, password hashing, CSRF helpers, and lightweight session rate limiting.</p><h3><code>Utils\UploadHandler</code></h3><p class="muted">Provides safer uploads with server-side validation, size limits, MIME and extension allowlists, and randomized filenames.</p><h3><code>Utils\Mailer</code></h3><p class="muted">Uses PHPMailer when available and falls back to <code>mail()</code> otherwise.</p></section>
+                <section id="routes"><h2>8. Route Organization</h2><ul class="list"><li><code>routes/get.php</code></li><li><code>routes/post.php</code></li><li><code>routes/put.php</code></li><li><code>routes/delete.php</code></li></ul><p class="muted">This split is acceptable for a small codebase. For larger applications, consider evolving toward domain-based route modules or grouped route registration.</p></section>
+                <section id="generator"><h2>9. Code Generation with <code>automat</code></h2><p class="muted">The built-in scaffolding tool generates models and controllers aligned with the project conventions.</p><pre><code>php automat list
+php automat create:model Article
+php automat create:controller ArticleController</code></pre><p class="muted">Generated controllers include MVC actions, API actions, JSON-aware request parsing, and route examples using direct controller-target dispatch.</p></section>
+                <section id="security"><h2>10. Security Considerations</h2><ul class="list"><li>Never deploy with placeholder JWT secrets.</li><li>Restrict <code>CORS_ALLOWED_ORIGINS</code> explicitly in production.</li><li>Do not trust client-provided filenames for uploads.</li><li>Keep <code>APP_DEBUG=false</code> outside development.</li><li>Extend <code>AuthService</code> instead of bypassing it.</li></ul></section>
+                <section id="testing"><h2>11. Testing Strategy</h2><p class="muted">The repository includes a lightweight test runner in <code>tests/run.php</code>.</p><ul class="list"><li>JSON request decoding</li><li>JWT acceptance and rejection behavior</li><li>Router dispatch to controller targets</li></ul><p class="muted">Recommended next additions include controller behavior tests, model integration tests, and route coverage for generated CRUD controllers.</p></section>
+                <section id="contribution"><h2>12. Recommended Contribution Rules</h2><ul class="list"><li>Keep bootstrap logic inside <code>public/index.php</code> minimal.</li><li>Add behavior to services before duplicating logic in controllers.</li><li>Prefer controller targets over route closures.</li><li>Keep models focused on persistence.</li><li>Document new environment variables in <code>.env.example</code>.</li><li>Update both documentation pages when architecture changes materially.</li></ul></section>
+                <section id="future"><h2>13. Future Improvements</h2><ul class="list"><li>A proper dependency injection container</li><li>Middleware support</li><li>Richer exception mapping</li><li>Typed DTOs or request validators</li><li>A dedicated test framework configuration</li></ul><p class="muted">The current structure is already a solid foundation for these upgrades because responsibilities are more clearly separated than in the initial project state.</p></section>
+            </div>
+        </div>
+    </main>
+    <footer class="shell footer"><p>Architecture MVC Libraries documentation for GitHub Pages. Return to <a href="index.html">documentation home</a>.</p></footer>
+</body>
+</html>
