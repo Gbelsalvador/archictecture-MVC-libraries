@@ -30,10 +30,10 @@ class ApiController extends Controller
     /**
      * Route: POST /api/echo
      */
-    public function echoPost(array $input = []): void
+    public function echoPost(...$args): void
     {
         $this->jsonResponse([
-            'received' => $input
+            'received' => $this->request->json()
         ]);
     }
 }

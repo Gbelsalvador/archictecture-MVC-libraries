@@ -6,10 +6,12 @@ class Core
 {
     protected Response $response;
     protected AuthService $authService;
+    protected Request $request;
 
-    public function __construct(?Response $response = null, ?AuthService $authService = null)
+    public function __construct(?Response $response = null, ?AuthService $authService = null, ?Request $request = null)
     {
         $this->response = $response ?? new Response();
+        $this->request = $request ?? new Request();
         $this->authService = $authService ?? new AuthService($this->response);
     }
 
@@ -31,29 +33,15 @@ class Core
      */
     public function http_json_input(): array
     {
-        $raw = file_get_contents('php://input');
-        if ($raw === false || $raw === '') {
-            return [];
-        }
-
-        $decoded = json_decode($raw, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
+        try {
+            return $this->request->json();
+        } catch (\InvalidArgumentException $exception) {
             $this->response->json([
                 'success' => false,
                 'error' => 'invalid_json_payload',
-                'message' => json_last_error_msg()
+                'message' => $exception->getMessage()
             ], 400);
         }
-
-        if (!is_array($decoded)) {
-            $this->response->json([
-                'success' => false,
-                'error' => 'invalid_json_payload',
-                'message' => 'Le contenu JSON doit être un objet ou un tableau associatif.'
-            ], 400);
-        }
-
-        return $decoded;
     }
 
     /**
@@ -61,20 +49,7 @@ class Core
      */
     protected function getAuthorizationHeader(): ?string
     {
-        if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
-            return $_SERVER['HTTP_AUTHORIZATION'];
-        }
-
-        if (function_exists('apache_request_headers')) {
-            $headers = apache_request_headers();
-            foreach ($headers as $key => $value) {
-                if (strcasecmp($key, 'Authorization') === 0) {
-                    return $value;
-                }
-            }
-        }
-
-        return null;
+        return $this->request->authorizationHeader();
     }
 
     /**
@@ -159,7 +134,7 @@ class Core
         header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
         header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With');
 
-        $origin = $_SERVER['HTTP_ORIGIN'] ?? null;
+        $origin = $this->request->server('HTTP_ORIGIN');
         $allowedOrigins = AppConfig::allowedOrigins();
 
         if ($origin && in_array($origin, $allowedOrigins, true)) {
@@ -169,7 +144,7 @@ class Core
             header('Access-Control-Allow-Origin: *');
         }
 
-        if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+        if ($this->request->method() === 'OPTIONS') {
             http_response_code(204);
             exit;
         }
@@ -186,6 +161,20 @@ class Core
     public function getResponse(): Response
     {
         return $this->response;
+    }
+
+    public function getRequest(): Request
+    {
+        return $this->request;
+    }
+
+    public function makeController(string $controllerClass): object
+    {
+        if (!class_exists($controllerClass)) {
+            throw new \RuntimeException("Contrôleur introuvable : {$controllerClass}");
+        }
+
+        return new $controllerClass(null, $this->response, $this->request);
     }
 }
 

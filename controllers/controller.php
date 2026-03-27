@@ -2,15 +2,18 @@
 namespace Controllers;
 
 use Core\Response;
+use Core\Request;
 use Models\DataModel;
 
 class Controller {
     protected DataModel $db;
     protected Response $response;
+    protected Request $request;
 
-    public function __construct(?DataModel $db = null, ?Response $response = null) {
+    public function __construct(?DataModel $db = null, ?Response $response = null, ?Request $request = null) {
         $this->db = $db ?? new DataModel();
         $this->response = $response ?? new Response();
+        $this->request = $request ?? new Request();
     }
 
     public function index(...$args) {

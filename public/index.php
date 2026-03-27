@@ -10,6 +10,7 @@ try {
     $core = new Core\Core($response);
     $router = new AltoRouter();
     $route = new Router\Router($router);
+    Router\Router::setDispatcher(fn (string $controllerClass) => $core->makeController($controllerClass));
 
     $core->header_cors_call();
 
