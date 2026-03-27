@@ -6,21 +6,18 @@
 
     // Test route that uses the example controller
     Router\Router::get('/api', function() use ($core) {
-        $controller = new Controllers\ApiController();
-        $data = $controller->index();
-        $core->jsonResponse(200, $data, true);
+        $controller = new Controllers\ApiController(null, $core->getResponse());
+        $controller->index();
     });
 
     Router\Router::get('/api/hello', function() use ($core) {
-        $controller = new Controllers\ApiController();
-        $data = $controller->hello();
-        $core->jsonResponse(200, $data, true);
+        $controller = new Controllers\ApiController(null, $core->getResponse());
+        $controller->hello();
     });
 
     Router\Router::get('/api/user/[i:id]', function($params) use ($core) {
-        $controller = new Controllers\ApiController();
-        $data = $controller->index($params);
-        $core->jsonResponse(200, $data, true);
+        $controller = new Controllers\ApiController(null, $core->getResponse());
+        $controller->index($params);
     });
 
 

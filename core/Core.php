@@ -4,13 +4,13 @@ namespace Core;
 
 class Core
 {
-    protected \Models\UserModel $userModel;
-    protected \Models\DataModel $dataModel;
+    protected Response $response;
+    protected AuthService $authService;
 
-    public function __construct()
+    public function __construct(?Response $response = null, ?AuthService $authService = null)
     {
-        $this->dataModel = new \Models\DataModel();
-        $this->userModel = new \Models\UserModel($this->dataModel);
+        $this->response = $response ?? new Response();
+        $this->authService = $authService ?? new AuthService($this->response);
     }
 
     /**
@@ -18,12 +18,12 @@ class Core
      */
     public function http_json_status_methode(int $status, string $message = '', array $datas = []): void
     {
-        $payload = ['message' => $message];
+        $payload = ['success' => $status < 400, 'message' => $message];
         if (!empty($datas)) {
             $payload['data'] = $datas;
         }
 
-        $this->jsonResponse($status, $payload);
+        $this->response->json($payload, $status);
     }
 
     /**
@@ -38,19 +38,19 @@ class Core
 
         $decoded = json_decode($raw, true);
         if (json_last_error() !== JSON_ERROR_NONE) {
-            $this->jsonResponse(400, [
+            $this->response->json([
+                'success' => false,
                 'error' => 'invalid_json_payload',
                 'message' => json_last_error_msg()
-            ]);
-            exit;
+            ], 400);
         }
 
         if (!is_array($decoded)) {
-            $this->jsonResponse(400, [
+            $this->response->json([
+                'success' => false,
                 'error' => 'invalid_json_payload',
                 'message' => 'Le contenu JSON doit être un objet ou un tableau associatif.'
-            ]);
-            exit;
+            ], 400);
         }
 
         return $decoded;
@@ -102,23 +102,15 @@ class Core
         $token = $this->getBearerToken();
         if (!$token) {
             if ($required) {
-                $this->jsonResponse(401, [
-                    'error' => 'missing_token',
-                    'message' => 'Le header Authorization Bearer est requis.'
-                ]);
-                exit;
+                $this->authService->abortUnauthorized('Le header Authorization Bearer est requis.', 'missing_token');
             }
             return null;
         }
 
-        $payload = $this->userModel->verifyJWT($token);
+        $payload = $this->authService->verifyToken($token);
         if (!$payload || empty($payload['user_id'])) {
             if ($required) {
-                $this->jsonResponse(401, [
-                    'error' => 'invalid_token',
-                    'message' => 'Token invalide ou expiré.'
-                ]);
-                exit;
+                $this->authService->abortUnauthorized('Token invalide ou expiré.');
             }
             return null;
         }
@@ -146,8 +138,9 @@ class Core
      * pour en affaire appel dans les fonctions anonymes lors de la creation d une route
      * @return void
      */
-    public function require_api_route_files($core): void
+    public function require_api_route_files(): void
     {
+        $core = $this;
         require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'get.php';
         require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'post.php';
         require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'put.php';
@@ -163,9 +156,18 @@ class Core
     public function header_cors_call(): void
     {
         header('Content-Type: application/json; charset=utf-8');
-        header('Access-Control-Allow-Origin: *');
         header('Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS');
         header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With');
+
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? null;
+        $allowedOrigins = AppConfig::allowedOrigins();
+
+        if ($origin && in_array($origin, $allowedOrigins, true)) {
+            header('Access-Control-Allow-Origin: ' . $origin);
+            header('Vary: Origin');
+        } elseif (!$origin && empty($allowedOrigins) && !AppConfig::isProduction()) {
+            header('Access-Control-Allow-Origin: *');
+        }
 
         if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
             http_response_code(204);
@@ -178,16 +180,12 @@ class Core
      */
     public function jsonResponse(int $status, array $payload, bool $terminate = false): void
     {
-        http_response_code($status);
-        if (!headers_sent()) {
-            header('Content-Type: application/json; charset=utf-8');
-        }
+        $this->response->json($payload, $status, $terminate);
+    }
 
-        echo json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-
-        if ($terminate) {
-            exit;
-        }
+    public function getResponse(): Response
+    {
+        return $this->response;
     }
 }
 

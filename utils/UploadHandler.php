@@ -15,7 +15,9 @@ class UploadHandler
         $this->allowedMime = $allowedMime;
         $this->allowedExt = $allowedExt;
         if (!is_dir($this->targetDir)) {
-            @mkdir($this->targetDir, 0755, true);
+            if (!mkdir($this->targetDir, 0755, true) && !is_dir($this->targetDir)) {
+                throw new \RuntimeException('Impossible de créer le dossier de destination des uploads.');
+            }
         }
     }
 
@@ -28,6 +30,10 @@ class UploadHandler
         $file = $_FILES[$fieldName];
         if ($file['error'] !== UPLOAD_ERR_OK) {
             return ['success' => false, 'error' => 'upload_error', 'code' => $file['error']];
+        }
+
+        if (!is_uploaded_file($file['tmp_name'])) {
+            return ['success' => false, 'error' => 'invalid_upload'];
         }
 
         if ($file['size'] > $this->maxSize) {
@@ -54,8 +60,16 @@ class UploadHandler
             return ['success' => false, 'error' => 'move_failed'];
         }
 
-        return ['success' => true, 'path' => $dest, 'mime' => $mime, 'name' => $safeName];
+        return [
+            'success' => true,
+            'path' => $this->buildPublicFacingPath($safeName),
+            'mime' => $mime,
+            'name' => $safeName
+        ];
+    }
+
+    protected function buildPublicFacingPath(string $fileName): string
+    {
+        return str_replace(DIRECTORY_SEPARATOR, '/', basename($this->targetDir) . DIRECTORY_SEPARATOR . $fileName);
     }
 }
-
-?>

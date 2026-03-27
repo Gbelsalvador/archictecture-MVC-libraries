@@ -6,13 +6,12 @@ class DataModel
 {
     protected ?\PDO $pdo = null;
 
-    public function __construct()
-    {
-        $this->connect();
-    }
-
     public function getPDO(): ?\PDO
     {
+        if (!$this->pdo instanceof \PDO) {
+            $this->connect();
+        }
+
         return $this->pdo;
     }
 

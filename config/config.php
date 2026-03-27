@@ -8,5 +8,3 @@ return [
 	 'DB_PASS' => $_ENV['DB_PASS'] ?? '',
 	 'DB_CHARSET' => $_ENV['DB_CHARSET'] ?? 'utf8mb4'
 ];
-
-$url = $_ENV['BASE_URL'] ?? "";// not necessary for now

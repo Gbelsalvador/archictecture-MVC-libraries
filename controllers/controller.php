@@ -1,13 +1,16 @@
 <?php
 namespace Controllers;
 
+use Core\Response;
 use Models\DataModel;
 
 class Controller {
     protected DataModel $db;
+    protected Response $response;
 
-    public function __construct() {
-        $this->db = new DataModel();
+    public function __construct(?DataModel $db = null, ?Response $response = null) {
+        $this->db = $db ?? new DataModel();
+        $this->response = $response ?? new Response();
     }
 
     public function index(...$args) {
@@ -16,7 +19,7 @@ class Controller {
     }
 
     public function render($view, $data = []) {
-        extract($data);
+        extract($data, EXTR_SKIP);
         $viewFile = __DIR__ . "/../views/" . $view . ".php";
         if (!file_exists($viewFile)) {
             throw new \Exception("Vue non trouvée : " . $viewFile);
@@ -55,10 +58,7 @@ class Controller {
          */
         public function jsonResponse($data, int $status = 200)
         {
-            http_response_code($status);
-            header('Content-Type: application/json');
-            echo json_encode($data);
-            exit;
+            $this->response->json((array) $data, $status);
         }
 
         /**

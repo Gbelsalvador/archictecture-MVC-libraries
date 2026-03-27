@@ -8,9 +8,19 @@ class Security
         if (is_array($input)) {
             return array_map([self::class, 'sanitize'], $input);
         }
+
+        if (!is_string($input)) {
+            return $input;
+        }
+
         $s = trim($input);
         $s = strip_tags($s);
-        return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        return $s;
+    }
+
+    public static function escape(string $input): string
+    {
+        return htmlspecialchars($input, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     public static function validateEmail(string $email): bool
