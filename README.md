@@ -290,4 +290,4 @@ Natural next steps for this codebase are:
 
 ## License
 
-No license file is currently provided in the repository. Add one before publishing or distributing the project externally.
+This project is licensed under the Apache License 2.0. See [LICENSE](/c:/wamp64/www/architecture-MVC-libraries/LICENSE).
