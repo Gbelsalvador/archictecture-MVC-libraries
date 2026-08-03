@@ -2,6 +2,7 @@ Version 1.1.0
 Date: 2026-08-03
 
 Corrections
+- Cleaned up `src/core/Core.php` and fixed the corrupted `http_json_input()` signature.
 - Fixed controller view rendering to load templates from the root `views/` directory instead of `src/views/`.
 - Hardened the router bootstrap so routes can be registered and matched even when the router is not pre-instantiated.
 - Improved controller dispatch fallback so routes targeting controller methods can still resolve cleanly.

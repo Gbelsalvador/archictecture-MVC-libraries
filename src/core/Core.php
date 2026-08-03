@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Core;
-use APP\Core\Response;
+
 class Core
 {
     protected Response $response;
@@ -21,6 +21,7 @@ class Core
     public function http_json_status_methode(int $status, string $message = '', array $datas = []): void
     {
         $payload = ['success' => $status < 400, 'message' => $message];
+
         if (!empty($datas)) {
             $payload['data'] = $datas;
         }
@@ -31,7 +32,7 @@ class Core
     /**
      * Récupère et décode le corps JSON de la requête.
      */
-    public function http_json_input(): arraybà   
+    public function http_json_input(): array
     {
         try {
             return $this->request->json();
@@ -39,8 +40,10 @@ class Core
             $this->response->json([
                 'success' => false,
                 'error' => 'invalid_json_payload',
-                'message' => $exception->getMessage()
+                'message' => $exception->getMessage(),
             ], 400);
+
+            return [];
         }
     }
 
@@ -79,6 +82,7 @@ class Core
             if ($required) {
                 $this->authService->abortUnauthorized('Le header Authorization Bearer est requis.', 'missing_token');
             }
+
             return null;
         }
 
@@ -87,6 +91,7 @@ class Core
             if ($required) {
                 $this->authService->abortUnauthorized('Token invalide ou expiré.');
             }
+
             return null;
         }
 
@@ -100,9 +105,9 @@ class Core
     {
         $userId = $this->getArtisteIdFromToken(true);
         if ($userId === null) {
-            // getArtisteIdFromToken gère déjà la réponse + exit
             exit;
         }
+
         return $userId;
     }
 
@@ -114,11 +119,9 @@ class Core
         require dirname(__DIR__) . DIRECTORY_SEPARATOR . 'routes' . DIRECTORY_SEPARATOR . 'delete.php';
     }
 
-
     /**
      * header_cors_call
      * cette methode recevera les en-tetes php pour l appel de cors
-     * @return void
      */
     public function header_cors_call(): void
     {
@@ -169,5 +172,3 @@ class Core
         return new $controllerClass(null, $this->response, $this->request);
     }
 }
-
-?>
