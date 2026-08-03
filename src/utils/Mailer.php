@@ -1,5 +1,5 @@
 <?php
-namespace Utils;
+namespace App\Utils;
 
 class Mailer
 {

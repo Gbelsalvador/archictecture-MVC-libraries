@@ -1,9 +1,9 @@
 <?php
-namespace Controllers;
+namespace App\Controllers;
 
-use Core\Response;
-use Core\Request;
-use Models\DataModel;
+use App\Core\Response;
+use App\Core\Request;
+use App\Models\DataModel;
 
 class Controller {
     protected DataModel $db;

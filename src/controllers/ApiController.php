@@ -1,5 +1,5 @@
 <?php
-namespace Controllers;
+namespace App\Controllers;
 
 class ApiController extends Controller
 {

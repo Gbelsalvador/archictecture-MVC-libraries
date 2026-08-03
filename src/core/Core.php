@@ -1,7 +1,7 @@
 <?php
 
-namespace Core;
-
+namespace App\Core;
+use APP\Core\Response;
 class Core
 {
     protected Response $response;
@@ -31,7 +31,7 @@ class Core
     /**
      * Récupère et décode le corps JSON de la requête.
      */
-    public function http_json_input(): array
+    public function http_json_input(): arraybà   
     {
         try {
             return $this->request->json();

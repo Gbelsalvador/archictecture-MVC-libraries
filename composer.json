@@ -1,12 +1,7 @@
 {
     "autoload": {
         "psr-4": {
-            "Core\\" : "core/",
-            "Controllers\\" : "controllers/",
-            "Models\\" : "models/",
-            "Router\\" : "router/",
-            "Config\\" : "config/",
-            "Utils\\" : "utils/"
+            "App\\": "src/"
         }
     },
     "name": "gbelsalvador/arichitecture-mvc-libraries",

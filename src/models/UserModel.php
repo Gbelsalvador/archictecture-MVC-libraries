@@ -1,9 +1,9 @@
 <?php
 
-namespace Models;
+namespace App\Models;
 
-use Core\AuthService;
-use Core\Response;
+use App\Core\AuthService;
+use App\Core\Response;
 
 class UserModel
 {
