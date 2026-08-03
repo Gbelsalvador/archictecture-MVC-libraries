@@ -1,0 +1,16 @@
+Version 1.1.0
+Date: 2026-08-03
+
+Corrections
+- Fixed controller view rendering to load templates from the root `views/` directory instead of `src/views/`.
+- Hardened the router bootstrap so routes can be registered and matched even when the router is not pre-instantiated.
+- Improved controller dispatch fallback so routes targeting controller methods can still resolve cleanly.
+- Added JSON `Content-Type` on 404 responses for consistent API output.
+
+Tests
+- Updated the router dispatch test to target the probe controller instead of the router class itself.
+- Verified the test suite passes after the fixes.
+
+Notes for release
+- This update focuses on bug fixes and runtime stability.
+- No public API breakage was introduced.

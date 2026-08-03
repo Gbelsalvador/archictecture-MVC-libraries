@@ -1,85 +1,90 @@
 <?php
+
 namespace App\Controllers;
 
-use App\Core\Response;
 use App\Core\Request;
+use App\Core\Response;
 use App\Models\DataModel;
 
-class Controller {
+class Controller
+{
     protected DataModel $db;
     protected Response $response;
     protected Request $request;
 
-    public function __construct(?DataModel $db = null, ?Response $response = null, ?Request $request = null) {
+    public function __construct(?DataModel $db = null, ?Response $response = null, ?Request $request = null)
+    {
         $this->db = $db ?? new DataModel();
         $this->response = $response ?? new Response();
         $this->request = $request ?? new Request();
     }
 
-    public function index(...$args) {
-        // page d'accueil, affichage le view index.php(ou index.tsx)
-        // Les classes enfants peuvent override avec leurs propres signatures
+    public function index(...$args)
+    {
+        // Point d'entrée par défaut pour les contrôleurs enfants.
     }
 
-    public function render($view, $data = []) {
+    public function render(string $view, array $data = []): void
+    {
         extract($data, EXTR_SKIP);
-        $viewFile = __DIR__ . "/../views/" . $view . ".php";
+        $viewFile = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'views' . DIRECTORY_SEPARATOR . $view . '.php';
+
         if (!file_exists($viewFile)) {
-            throw new \Exception("Vue non trouvée : " . $viewFile);
+            throw new \Exception('Vue non trouvée : ' . $viewFile);
         }
+
         include $viewFile;
     }
 
-    public function redirection($url) {
-        if (empty($url)) return;
+    public function redirection(string $url): void
+    {
+        if ($url === '') {
+            return;
+        }
+
         if (!headers_sent()) {
-            header("Location: $url"); 
+            header("Location: $url");
         } else {
             echo "<script>window.location.href='" . htmlspecialchars($url, ENT_QUOTES) . "';</script>";
         }
+
         exit;
     }
 
-    public function isConnected() {
+    public function isConnected(): bool
+    {
         return $this->db->getPDO() instanceof \PDO;
     }
 
-    public function success($message) {
-            echo "<h1>Succès : </h1><p>" . htmlspecialchars($message, ENT_QUOTES) . "</p>";
-        }
+    public function success(string $message): void
+    {
+        echo '<h1>Succès :</h1><p>' . htmlspecialchars($message, ENT_QUOTES) . '</p>';
+    }
 
-    public function error($message) {
-            echo "<h1>Erreur : </h1><p>" . htmlspecialchars($message, ENT_QUOTES) . "</p>";
-        }
+    public function error(string $message): void
+    {
+        echo '<h1>Erreur :</h1><p>' . htmlspecialchars($message, ENT_QUOTES) . '</p>';
+    }
 
-        /**
-         * Réponse JSON générique
-         *
-         * @param mixed $data Données à renvoyer
-         * @param int $status Code HTTP
-         * @return void
-         */
-        public function jsonResponse($data, int $status = 200)
-        {
-            $this->response->json((array) $data, $status);
-        }
+    /**
+     * Réponse JSON générique.
+     *
+     * @param mixed $data Données à renvoyer
+     */
+    public function jsonResponse($data, int $status = 200): void
+    {
+        $this->response->json((array) $data, $status);
+    }
 
-        /**
-         * Réponse JSON pour succès simple
-         */
-        public function jsonSuccess(string $message, array $extra = [], int $status = 200)
-        {
-            $payload = array_merge(['success' => true, 'message' => $message], $extra);
-            $this->jsonResponse($payload, $status);
-        }
+    public function jsonSuccess(string $message, array $extra = [], int $status = 200): void
+    {
+        $payload = array_merge(['success' => true, 'message' => $message], $extra);
+        $this->jsonResponse($payload, $status);
+    }
 
-        /**
-         * Réponse JSON pour erreur
-         */
-        public function jsonError(string $message, int $status = 400, array $extra = [])
-        {
-            $payload = array_merge(['success' => false, 'error' => $message], $extra);
-            $this->jsonResponse($payload, $status);
-        }
-
+    public function jsonError(string $message, int $status = 400, array $extra = []): void
+    {
+        $payload = array_merge(['success' => false, 'error' => $message], $extra);
+        $this->jsonResponse($payload, $status);
+    }
 }

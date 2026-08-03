@@ -85,7 +85,7 @@ function testRouterDispatchesControllerArrayTarget(): void
     $router = new AltoRouter();
     new App\Router\Router($router);
     App\Router\Router::setDispatcher(static fn (string $controllerClass) => new $controllerClass());
-    App\Router\Router::get('/tests/router/[i:id]', [App\Router\Router::class, 'capture']);
+    App\Router\Router::get('/tests/router/[i:id]', [RouterDispatchProbeController::class, 'capture']);
     App\Router\Router::matcher();
 
     assertTrue((RouterDispatchProbeController::$captured['id'] ?? null) === '7', 'Le routeur devrait dispatcher une cible contrôleur.');
