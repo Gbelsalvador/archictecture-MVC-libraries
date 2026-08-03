@@ -1,13 +1,13 @@
 <?php
 
 require dirname(__DIR__) . '/vendor/autoload.php';
-require_once dirname(__DIR__) . '/config/env.php';
+require_once dirname(__DIR__) . '/src/config/env.php';
 
 if (file_exists(dirname(__DIR__) . '/.env')) {
     loadEnv(dirname(__DIR__) . '/.env');
 }
 
-final class RouterDispatchProbeController extends \Controllers\Controller
+final class RouterDispatchProbeController extends App\Controllers\Controller
 {
     public static array $captured = [];
 
@@ -41,7 +41,7 @@ function makeJwt(array $payload, string $secret): string
 
 function testRequestJsonParsesPayload(): void
 {
-    $request = new \Core\Request('{"hello":"world"}');
+    $request = new App\Core\Request('{"hello":"world"}');
     $decoded = $request->json();
 
     assertTrue(($decoded['hello'] ?? null) === 'world', 'La requête JSON devrait être décodée.');
@@ -52,8 +52,8 @@ function testAuthServiceAcceptsValidToken(): void
     $_ENV['JWT_SECRET'] = 'test_secret';
     putenv('JWT_SECRET=test_secret');
 
-    $response = new \Core\Response();
-    $auth = new \Core\AuthService($response);
+    $response = new App\Core\Response();
+    $auth = new App\Core\AuthService($response);
     $token = makeJwt(['user_id' => 42, 'exp' => time() + 3600], 'test_secret');
 
     $payload = $auth->verifyToken($token);
@@ -66,8 +66,8 @@ function testAuthServiceRejectsExpiredToken(): void
     $_ENV['JWT_SECRET'] = 'test_secret';
     putenv('JWT_SECRET=test_secret');
 
-    $response = new \Core\Response();
-    $auth = new \Core\AuthService($response);
+    $response = new App\Core\Response();
+    $auth = new App\Core\AuthService($response);
     $token = makeJwt(['user_id' => 42, 'exp' => time() - 60], 'test_secret');
 
     $payload = $auth->verifyToken($token);
@@ -82,11 +82,11 @@ function testRouterDispatchesControllerArrayTarget(): void
     $_SERVER['REQUEST_METHOD'] = 'GET';
     $_SERVER['REQUEST_URI'] = '/tests/router/7';
 
-    $router = new \AltoRouter();
-    new \Router\Router($router);
-    \Router\Router::setDispatcher(static fn (string $controllerClass) => new $controllerClass());
-    \Router\Router::get('/tests/router/[i:id]', [RouterDispatchProbeController::class, 'capture']);
-    \Router\Router::matcher();
+    $router = new AltoRouter();
+    new App\Router\Router($router);
+    App\Router\Router::setDispatcher(static fn (string $controllerClass) => new $controllerClass());
+    App\Router\Router::get('/tests/router/[i:id]', [App\Router\Router::class, 'capture']);
+    App\Router\Router::matcher();
 
     assertTrue((RouterDispatchProbeController::$captured['id'] ?? null) === '7', 'Le routeur devrait dispatcher une cible contrôleur.');
 }
